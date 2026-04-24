@@ -51,6 +51,31 @@ class AudioService {
             throw new Error(`Áudio recusado. Pico máximo (${picoMaximo}) foi muito fraco. O alvo não foi atingido ou o microfone falhou.`);
         }
     }
+    recortarAudio() {
+        let picoMaximo = 0;
+        let indiceDoPico = 0;
+
+        // 1. Encontra exatamente ONDE o tiro aconteceu no tempo
+        for (let i = 0; i < this.buffer.length; i++) {
+            if (Math.abs(this.buffer[i]) > picoMaximo) {
+                picoMaximo = Math.abs(this.buffer[i]);
+                indiceDoPico = i;
+            }
+        }
+
+        // Taxa: 16.000 amostras = 1 segundo.
+        // 100ms = 1600 amostras | 400ms = 6400 amostras
+        const amostrasAntes = 1600;
+        const amostrasDepois = 6400;
+
+        let inicio = Math.max(0, indiceDoPico - amostrasAntes);
+        let fim = Math.min(this.buffer.length, indiceDoPico + amostrasDepois);
+
+        // 2. Cria um novo buffer cirúrgico de exatos 500ms
+        const bufferRecortado = this.buffer.slice(inicio, fim);
+        
+        return bufferRecortado;
+    }
 
     gerarNomeArquivo(categoria) {
         const pasta = path.join(CONFIG.SISTEMA.PASTA_DATASET, categoria);
@@ -62,24 +87,29 @@ class AudioService {
     salvarWav(categoria) {
         return new Promise((resolve, reject) => {
             try {
-                // Roda o filtro antes de salvar!
+                // 1. Roda o filtro para ver se não foi um tiro muito fraco (silêncio)
                 this.validarEFiltrar(categoria);
+
+                // 2. RECORTA O ÁUDIO! Pega apenas os 500ms perfeitos do tiro
+                const bufferCirurgico = this.recortarAudio();
 
                 const caminho = this.gerarNomeArquivo(categoria);
                 const wav = new WaveFile();
                 
+                // 3. Salva usando o áudio recortado, e não o buffer inteiro
                 wav.fromScratch(
                     CONFIG.AUDIO.CANAIS, 
                     CONFIG.AUDIO.TAXA_AMOSTRAGEM, 
                     CONFIG.AUDIO.BIT_DEPTH, 
-                    this.buffer
+                    bufferCirurgico // <--- AQUI ESTÁ A GRANDE MUDANÇA
                 );
                 
                 fs.writeFileSync(caminho, wav.toBuffer());
                 this.amostrasLidas = 0; 
+                
                 resolve({ caminho: caminho, buffer: wav.toBuffer() });
             } catch (error) {
-                this.amostrasLidas = 0; // Reseta mesmo dando erro para não travar
+                this.amostrasLidas = 0; // Reseta mesmo dando erro para não travar o sistema
                 reject(error);
             }
         });
