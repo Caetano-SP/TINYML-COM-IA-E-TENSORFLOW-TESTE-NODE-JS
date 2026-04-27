@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>STORM X PRO - Lab</title>
+    <style>
+        body { background-color: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; margin-top: 50px; }
+        canvas { background-color: #1e1e1e; border: 2px solid #333; border-radius: 10px; margin: 20px 0; }
+        button { padding: 15px 30px; font-size: 18px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        #btnGravar { background-color: #ff9800; color: white; }
+        .btnSalvar { background-color: #4CAF50; color: white; display: none; }
+        #btnDescartar { background-color: #f44336; color: white; display: none; }
+    </style>
+</head>
+<body>
+    <h1>🎯 STORM X PRO - Laboratório Acústico</h1>
+    <p>Aperte gravar, dê o disparo e avalie a onda sonora antes de salvar.</p>
+
+    <button id="btnGravar">🔴 Iniciar Gravação</button>
+    <br>
+    <canvas id="ondaSonora" width="800" height="200"></canvas>
+    <br>
+    
+    <div id="painelAcao">
+        <button class="btnSalvar" onclick="salvar('acerto')">Salvar como ACERTO</button>
+        <button class="btnSalvar" onclick="salvar('tiro_erro')">Salvar como ERRO</button>
+        <button class="btnSalvar" onclick="salvar('ruido')">Salvar como RUÍDO</button>
+        <button id="btnDescartar" onclick="descartar()">🗑️ Descartar Lixo</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const canvas = document.getElementById('ondaSonora');
+        const ctx = canvas.getContext('2d');
+        const botoesAcao = document.querySelectorAll('.btnSalvar, #btnDescartar');
+
+        document.getElementById('btnGravar').addEventListener('click', () => {
+            document.getElementById('btnGravar').innerText = "Verificando hardware...";
+            botoesAcao.forEach(b => b.style.display = 'none');
+            socket.emit('comando_gravar');
+        });
+
+        socket.on('gravacao_iniciada', () => {
+            document.getElementById('btnGravar').innerText = "Ouvindo... ATIRE!";
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+        });
+
+        socket.on('erro_hardware', (mensagem) => {
+            alert("⚠️ ERRO CRÍTICO: " + mensagem);
+            document.getElementById('btnGravar').innerText = "🔴 Tentar Gravar Novamente";
+        });
+
+        socket.on('waveform_pronto', (dados) => {
+            document.getElementById('btnGravar').innerText = "🔴 Nova Gravação";
+            desenharGrafico(dados);
+            botoesAcao.forEach(b => b.style.display = 'inline-block'); 
+        });
+
+        function desenharGrafico(dados) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 2;
+            
+            const meioY = canvas.height / 2;
+            const escalaY = canvas.height / 65536; 
+            const passoX = canvas.width / dados.length;
+
+            for (let i = 0; i < dados.length; i++) {
+                let x = i * passoX;
+                let y = meioY - (dados[i] * escalaY);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        function salvar(categoria) {
+            socket.emit('comando_salvar', categoria);
+            botoesAcao.forEach(b => b.style.display = 'none');
+            alert('Enviado para Nuvem/Disco!');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function descartar() {
+            socket.emit('comando_descartar');
+            botoesAcao.forEach(b => b.style.display = 'none');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    </script>
+</body>
+</html>

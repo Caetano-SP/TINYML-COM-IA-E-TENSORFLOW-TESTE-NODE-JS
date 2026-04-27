@@ -1,108 +1,76 @@
 const HardwareService = require('./src/HardwareService');
 const AudioService = require('./src/AudioService');
-const TerminalUI = require('./src/TerminalUI');
 const LoggerService = require('./src/LoggerService');
-const CloudService = require('./src/CloudService'); // 1. IMPORTA A NUVEM
+const CloudService = require('./src/CloudService');
+const WebServer = require('./src/WebServer');
 
 class AppOrquestrador {
     constructor() {
         this.hardware = new HardwareService();
         this.audio = new AudioService();
-        this.ui = new TerminalUI();
         this.logger = new LoggerService();
-        this.cloud = new CloudService(this.logger); // 2. LIGA A NUVEM
-        
-        this.estado = { gravando: false, categoriaAtual: null };
+        this.cloud = new CloudService(this.logger);
+        this.web = new WebServer(this); 
+        this.gravando = false;
         this.configurarEventos();
     }
 
     iniciar() {
-        this.ui.mostrarCabecalho();
-        this.hardware.conectar();
+        this.web.iniciar(); 
+        this.hardware.conectar(); 
     }
 
     configurarEventos() {
-        // Eventos de Hardware
         this.hardware.on('conectado', (porta) => {
-            this.ui.logSucesso(`Microfone INMP441 sincronizado na porta ${porta}`);
-            this.apresentarMenu();
+            console.log(`\n✅ [ STATUS ]: Hardware conectado na ${porta}.`);
+            console.log(`🎯 Tudo pronto! Acesse o navegador.\n`);
         });
 
         this.hardware.on('erro', (msg) => {
-            this.ui.logErro(`Falha de Hardware: ${msg}`);
-            process.exit(1);
+            console.log(`\n❌ [ ALERTA ]: ESP32 não encontrado. Motivo: ${msg}`);
+            console.log(`🔌 Conecte o cabo USB e reinicie o painel.\n`);
         });
 
-        // Loop de alta performance (Recebimento de Dados)
         this.hardware.on('dado', (valor) => {
-            if (!this.estado.gravando) return;
-
+            if (!this.gravando) return;
             const finalizou = this.audio.adicionarAmostra(valor);
             
-            // Otimiza a renderização da tela para não gastar processamento à toa
-            if (this.audio.amostrasLidas % 800 === 0) {
-                this.ui.atualizarBarraProgresso(this.audio.getProgresso());
-            }
-
             if (finalizou) {
-                this.finalizarGravacao();
-            }
-        });
-
-        // Intercepta Ctrl+C para desligamento seguro
-        process.on('SIGINT', () => this.desligarSeguro());
-    }
-
-    apresentarMenu() {
-        this.ui.perguntarOpcao((opcao) => {
-            const mapas = { '1': 'acerto', '2': 'tiro_erro', '3': 'ruido' };
-            
-            if (opcao === '0') return this.desligarSeguro();
-            
-            if (mapas[opcao]) {
-                this.estado.categoriaAtual = mapas[opcao];
-                this.ui.aguardarAcao(this.estado.categoriaAtual, () => {
-                    this.estado.gravando = true;
-                });
-            } else {
-                this.ui.logAviso("Opção inválida.");
-                this.apresentarMenu();
+                this.gravando = false;
+                const bufferCirurgico = this.audio.recortarAudio();
+                this.web.enviarWaveform(bufferCirurgico);
             }
         });
     }
 
-    async finalizarGravacao() {
-        this.estado.gravando = false;
-        console.log(''); 
-        
-        try {
-            // Passo A: Filtra e Salva no Windows
-            const { caminho, buffer } = await this.audio.salvarWav(this.estado.categoriaAtual);
-            this.ui.logSucesso(`Local: Arquivo salvo em ${caminho}`);
-            
-            // Passo B: Pega apenas o nome (ex: acerto_001.wav) e envia para a Nuvem
-            this.ui.logAviso("Sincronizando com a IA (Edge Impulse)...");
-            const nomeArquivo = caminho.split(/[\\/]/).pop();
-            
-            await this.cloud.enviar(buffer, nomeArquivo, this.estado.categoriaAtual);
-            this.ui.logSucesso("Nuvem: Upload concluído! O Edge Impulse já tem esse dado.");
-            this.logger.info(`Sincronização Total: ${nomeArquivo}`);
-
-        } catch (error) {
-            this.ui.logErro(error.message);
-            this.logger.erro(`Falha no ciclo: ${error.message}`);
+    iniciarCaptura() {
+        if (!this.hardware.conectado) {
+            this.logger.aviso("Tentativa de gravação bloqueada: ESP32 desconectado.");
+            return false; 
         }
-        
-        setTimeout(() => this.apresentarMenu(), 2000);
+        this.audio.amostrasLidas = 0; 
+        this.gravando = true;
+        return true; 
     }
 
-    desligarSeguro() {
-        this.ui.logAviso("\nDesconectando ESP32 com segurança...");
-        this.hardware.desconectar();
-        process.exit(0);
+    async finalizarE_Salvar(categoria) {
+        try {
+            const { caminho, buffer } = await this.audio.salvarWav(categoria);
+            const nomeArquivo = caminho.split(/[\\/]/).pop();
+            await this.cloud.enviar(buffer, nomeArquivo, categoria);
+            this.logger.info(`Salvo e na Nuvem: ${nomeArquivo}`);
+            console.log(`[ INFO ] Salvo: ${nomeArquivo}`);
+        } catch (error) {
+            this.logger.erro(`Erro ao salvar: ${error.message}`);
+            console.log(`[ ERRO ] ${error.message}`);
+        }
+    }
+
+    descartarAudio() {
+        this.audio.amostrasLidas = 0;
+        this.logger.info("Áudio descartado pelo usuário.");
     }
 }
 
-// Inicia o motor
 const app = new AppOrquestrador();
 app.iniciar();
