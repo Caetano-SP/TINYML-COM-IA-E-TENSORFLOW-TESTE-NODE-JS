@@ -2,7 +2,7 @@ const path = require('path');
 
 const CONFIG = {
     HARDWARE: {
-        PORTA: 'COM3', // Sua porta
+        PORTA: 'COM14', // Mude se necessário no PC do trabalho
         BAUD_RATE: 460800,
         DELIMITER: '\r\n'
     },
@@ -14,9 +14,8 @@ const CONFIG = {
         NOISE_GATE_THRESHOLD: 150, 
         IMPACTO_MINIMO_THRESHOLD: 4000 
     },
-    // --- NOVO: DADOS DA NUVEM ---
     NUVEM: {
-        API_KEY: 'COLE_SUA_API_KEY_AQUI', // <--- COLOQUE A CHAVE QUE VOCÊ COPIOU AQUI
+        API_KEY: 'ei_a223079d7b3b7daf9998cf6655f9458aa02af07206f21ca2',
         ENDPOINT: 'https://ingestion.edgeimpulse.com/api/training/data'
     },
     SISTEMA: {

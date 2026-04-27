@@ -7,7 +7,7 @@ class CloudService {
 
     async enviar(bufferWav, nomeArquivo, categoria) {
         if (!CONFIG.NUVEM.API_KEY || CONFIG.NUVEM.API_KEY === 'COLE_SUA_API_KEY_AQUI') {
-            throw new Error("NUVEM DESLIGADA: API Key não configurada. Arquivo ficou só no disco local.");
+            throw new Error("NUVEM DESLIGADA: API Key não configurada. Salvo apenas localmente.");
         }
 
         try {
@@ -26,11 +26,10 @@ class CloudService {
                 const erroApi = await resposta.text();
                 throw new Error(`Recusado pelo servidor: ${erroApi}`);
             }
-
             return true;
         } catch (error) {
-            this.logger.erro(`Falha no upload para a nuvem: ${error.message}`);
-            throw error; // Repassa o erro para o Orquestrador avisar na tela
+            this.logger.erro(`Falha upload nuvem: ${error.message}`);
+            throw error; 
         }
     }
 }

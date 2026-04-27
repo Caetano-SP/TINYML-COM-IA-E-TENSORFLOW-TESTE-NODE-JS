@@ -15,23 +15,16 @@ class WebServer {
     }
 
     configurarRotas() {
-        // Serve a interface gráfica que vamos criar na pasta public
         this.app.use(express.static(path.join(__dirname, '..', 'public')));
     }
 
     configurarSockets() {
         this.io.on('connection', (socket) => {
-            console.log("🖥️ Dashboard Web Conectado!");
-
-            // Recebe os comandos dos botões do site
             socket.on('comando_gravar', () => {
                 const hardwarePronto = this.orquestrador.iniciarCaptura();
-                
                 if (!hardwarePronto) {
-                    // Manda uma mensagem de erro de volta pro site!
                     socket.emit('erro_hardware', "Hardware ESP32 desconectado! Verifique o cabo USB.");
                 } else {
-                    // Tudo ok, manda o site mudar o botão
                     socket.emit('gravacao_iniciada');
                 }
             });
@@ -46,9 +39,7 @@ class WebServer {
         });
     }
 
-    // Envia o áudio recortado para o site desenhar a onda sonora (Waveform)
     enviarWaveform(bufferRecortado) {
-        // Converte o Int16Array para um Array normal pro navegador entender
         const dadosGrafico = Array.from(bufferRecortado);
         this.io.emit('waveform_pronto', dadosGrafico);
     }

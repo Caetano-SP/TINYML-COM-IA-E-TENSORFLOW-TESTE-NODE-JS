@@ -13,11 +13,7 @@ class HardwareService extends EventEmitter {
 
     conectar() {
         try {
-            this.porta = new SerialPort({ 
-                path: CONFIG.HARDWARE.PORTA, 
-                baudRate: CONFIG.HARDWARE.BAUD_RATE 
-            });
-            
+            this.porta = new SerialPort({ path: CONFIG.HARDWARE.PORTA, baudRate: CONFIG.HARDWARE.BAUD_RATE });
             this.parser = this.porta.pipe(new ReadlineParser({ delimiter: CONFIG.HARDWARE.DELIMITER }));
 
             this.porta.on('open', () => {
@@ -35,22 +31,12 @@ class HardwareService extends EventEmitter {
                 this.emit('desconectado');
             });
 
-            // Repassa os dados brutos como eventos para o sistema principal
             this.parser.on('data', (linha) => {
                 const valor = parseInt(linha.trim(), 10);
-                if (!isNaN(valor)) {
-                    this.emit('dado', valor);
-                }
+                if (!isNaN(valor)) this.emit('dado', valor);
             });
-
         } catch (error) {
             this.emit('erro', error.message);
-        }
-    }
-
-    desconectar() {
-        if (this.porta && this.porta.isOpen) {
-            this.porta.close();
         }
     }
 }

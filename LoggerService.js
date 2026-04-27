@@ -4,7 +4,6 @@ const CONFIG = require('./config');
 
 class LoggerService {
     constructor() {
-        // O log ficará salvo dentro da pasta dataset
         this.caminhoLog = path.join(CONFIG.SISTEMA.PASTA_DATASET, 'storm_erros.log');
         this.iniciarLog();
     }
@@ -17,15 +16,9 @@ class LoggerService {
     }
 
     escrever(nivel, mensagem) {
-        // Pega a data e hora exata do erro
         const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
         const linha = `[${timestamp}] [${nivel}] ${mensagem}\n`;
-        
-        try {
-            fs.appendFileSync(this.caminhoLog, linha);
-        } catch (error) {
-            console.error("Falha catastrófica ao escrever no log: ", error);
-        }
+        try { fs.appendFileSync(this.caminhoLog, linha); } catch (error) {}
     }
 
     info(msg) { this.escrever('INFO', msg); }
